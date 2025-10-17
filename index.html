@@ -206,7 +206,7 @@
             }
         },
       },
-        resources: [
+            resources: [
             { category: "Premium Materials", items: [
                 { title: "Bridge Course Book", link: "https://drive.google.com/file/d/1Q1i4sf6BStnIt4XgZRuLmPk3fL3AHx7x/view?usp=drive_link", tags: ['book', 'core'] },
                 { title: "Advance Mathematics Book", link: "https://drive.google.com/file/d/1DpIqrtanBnn5cWdXPCY6c18NdtnwKGRl/view?usp=sharing", tags: ['book', 'math'] },
@@ -346,7 +346,6 @@
             PREMIUM_USER: { id: 'PREMIUM_USER', title: 'Premium Supporter', icon: 'fas fa-star', description: 'Unlock premium access to support the portal.', hasCertificate: true }
         },
     };
-
     // =================================================================================
     // ===== HELPER FUNCTIONS & REUSABLE UI COMPONENTS =====
     // =================================================================================
@@ -615,6 +614,7 @@
         const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
         const [userAnswers, setUserAnswers] = useState([]);
         const [timer, setTimer] = useState(10);
+        const [isTimeUp, setIsTimeUp] = useState(false); // New state for time up message
         const timerRef = useRef(null);
 
         useEffect(() => {
@@ -622,8 +622,12 @@
                 timerRef.current = setInterval(() => {
                     setTimer(prev => {
                         if (prev === 1) {
-                            handleNext(true); // Auto-move to next when time is up
-                            return 10;
+                            clearInterval(timerRef.current);
+                            setIsTimeUp(true); // Show time's up message
+                            setTimeout(() => {
+                                handleNext(true); // Auto-move to next after showing message
+                            }, 1500); // Wait 1.5s before moving
+                            return 0;
                         }
                         return prev - 1;
                     });
@@ -635,13 +639,11 @@
         const resetTimer = () => {
             clearInterval(timerRef.current);
             setTimer(10);
+            setIsTimeUp(false); // Reset time's up message
         };
         
         const handleNext = (isTimeUp = false) => {
             resetTimer();
-            if (!isTimeUp && userAnswers[currentQuestionIndex] === null) {
-                // If user clicks next without answering, mark it as null
-            }
             if (currentQuestionIndex < activeQuizData.questions.length - 1) {
                 setCurrentQuestionIndex(prev => prev + 1);
             } else {
@@ -704,10 +706,10 @@
         };
 
         const handleAnswerSelect = (answer) => {
+            if (userAnswers[currentQuestionIndex] !== null) return; // Prevent changing answer
             const newAnswers = [...userAnswers];
             newAnswers[currentQuestionIndex] = answer;
             setUserAnswers(newAnswers);
-            setTimeout(() => handleNext(), 500); // Auto-move after a short delay
         };
 
         if (view === 'results') { return <Section><QuizResults quizData={activeQuizData} userAnswers={userAnswers} onRestart={() => startQuiz(activeQuizData)} onSelectNew={() => setView('subject_select')} /></Section>; }
@@ -717,35 +719,51 @@
             const timerColor = timer > 5 ? 'text-green-500' : timer > 2 ? 'text-yellow-500' : 'text-red-500';
             return (
                 <Section>
-                    <div className="w-full max-w-3xl mx-auto bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-2xl animate-popIn">
+                    <div className="w-full max-w-3xl mx-auto bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-2xl animate-popIn relative overflow-hidden">
+                        {isTimeUp && (
+                            <div className="absolute inset-0 bg-red-800/80 backdrop-blur-sm flex flex-col justify-center items-center z-20 animate-popIn">
+                                <i className="far fa-clock text-7xl text-white animate-tada"></i>
+                                <h2 className="text-5xl font-extrabold text-white mt-4">Time's Up!</h2>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="font-serif text-xl font-bold text-slate-800 dark:text-white">{activeQuizData.title}</h2>
-                            <div className={`flex items-center gap-2 font-bold text-lg ${timerColor}`}>
-                                <i className="far fa-clock"></i>
-                                <span>{timer}s</span>
+                            <div className="flex items-center gap-4">
+                                <div className={`flex items-center gap-2 font-bold text-lg ${timerColor}`}>
+                                    <i className="far fa-clock"></i>
+                                    <span>{timer}s</span>
+                                </div>
+                                <span className="font-semibold text-slate-500 dark:text-slate-400">{currentQuestionIndex + 1} / {activeQuizData.questions.length}</span>
                             </div>
                         </div>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mb-6"> <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${((currentQuestionIndex + 1) / activeQuizData.questions.length) * 100}%` }}></div> </div>
-                        <h3 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-white mb-8 text-center">{currentQuestionIndex + 1}. {currentQuestion.question}</h3>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mb-6"> <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / activeQuizData.questions.length) * 100}%` }}></div> </div>
+                        <h3 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-white mb-8 text-center min-h-[6rem] flex items-center justify-center animate-fadeIn">{currentQuestion.question}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {currentQuestion.options.map(option => {
                                 const isSelected = userAnswers[currentQuestionIndex] === option;
-                                const isCorrect = currentQuestion.correctAnswer === option;
+                                
                                 let buttonClass = 'p-4 rounded-lg text-left font-semibold border-2 transition-all duration-300 ';
-                                if(isSelected && isCorrect) buttonClass += 'bg-green-500 border-green-500 text-white animate-tada';
-                                else if (isSelected && !isCorrect) buttonClass += 'bg-red-500 border-red-500 text-white';
-                                else buttonClass += 'bg-slate-100 dark:bg-slate-900/50 border-transparent hover:border-indigo-400 dark:hover:border-indigo-500';
+                                if(isSelected) {
+                                   buttonClass += 'bg-indigo-500 border-indigo-500 text-white shadow-lg transform scale-105';
+                                } else {
+                                   buttonClass += 'bg-slate-100 dark:bg-slate-900/50 border-transparent hover:border-indigo-400 dark:hover:border-indigo-500';
+                                }
                                 return <button key={option} onClick={() => handleAnswerSelect(option)} disabled={userAnswers[currentQuestionIndex] !== null} className={buttonClass}>{option}</button>
                             })}
                         </div>
-                         {timer <= 0 && <p className="text-center mt-6 font-bold text-red-500 animate-pulse text-xl">Time's Up!</p>}
+                        <div className="mt-8 text-right">
+                             <button onClick={() => handleNext()} disabled={userAnswers[currentQuestionIndex] === null}
+                                className="gradient-button px-10 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity">
+                                {currentQuestionIndex < activeQuizData.questions.length - 1 ? 'Next' : 'Finish'} <i className="fa-solid fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </Section>
             );
         }
 
         if (view === 'quiz_config') {
-            const questionOptions = [5, 10, 15, 20];
+            const questionOptions = [10, 20, 30, 50]; // Changed options
             return (
                 <Section title={`Configure Mixed ${activeSubject} Quiz`} subtitle="How many questions would you like?">
                     <div className="max-w-xl mx-auto text-center">
@@ -992,3 +1010,4 @@
 </script>
 </body>
 </html>
+
